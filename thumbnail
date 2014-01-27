@@ -1,0 +1,89 @@
+# Blosxom Plugin: thumbnail
+# Author(s): hinoa
+# Version: 2009-12-28
+
+package thumbnail;
+
+use strict;
+
+# --- Configurable variables -----------
+my @image_extension = ('jpg','gif','png');
+my $image_dir = $blosxom::datadir;
+my $image_url = $blosxom::url.'/files';
+my $thumb_prefix = 'thm_';
+my $thumb_extension = 'png';
+my $thumb_size = 60;
+
+# --- Plug-in package variables --------
+$thumbnail::image = '';
+
+# --------------------------------------
+
+use Image::Magick;
+
+sub start {
+    1;
+}
+
+sub story {
+  my($pkg, $path, $filename, $story_ref, $title_ref, $body_ref) = @_;
+  my $tag = '';
+  my $image_path = '';
+  my $image_fn = '';
+  my $thumb_fn = '';
+  my $size;
+  $thumbnail::image = '';
+  
+  #search image
+  foreach (@image_extension) {
+    if (-f qq!$image_dir$path/$filename.$_!){
+        $image_path = qq!$image_dir$path/$filename.$_!;
+        $image_fn = qq!$filename.$_!;
+        last;
+    }
+  }
+  return 0 if ($image_fn eq '');
+  
+  #create thumbnail
+  my $org = Image::Magick->new;
+
+  if (-f qq!$image_dir$path/$thumb_prefix$filename.$thumb_extension!) {
+    #already exsist
+    $thumb_fn = qq!$thumb_prefix$filename.$thumb_extension!;
+    
+  } else {
+    #make thumbnail
+    $org->Read($image_path);
+    $org->Scale( geometry=>"$thumb_size x $thumb_size" );
+    $org->Write(qq!$image_dir$path/$thumb_prefix$filename.$thumb_extension!);
+    if (-f qq!$image_dir$path/$thumb_prefix$filename.$thumb_extension!) {
+        $thumb_fn = qq!$thumb_prefix$filename.$thumb_extension!;
+    }
+  }
+  
+  #original
+  if ($blosxom::path_info =~ /\./) {
+    my ($size_w, $size_h, $size, $format) = $org->Ping($image_path);
+    $tag .= qq!<a href="$image_url$path/$image_fn">!;
+    $tag .= qq!<img width="$size_w" height="$size_h" src="$image_url$path/$image_fn"!;
+    
+  #thumbnail
+  } else {  
+    my ($size_w, $size_h, $size, $format) = $org->Ping(qq!$image_dir$path/$thumb_fn!);
+    $tag .= qq!<a href="$blosxom::url$path/$filename.$blosxom::default_flavour">!;
+    $tag .= qq!<img width="$size_w" height="$size_h" src="$image_url$path/$thumb_fn"!;
+    
+  }
+  
+  #alt
+  $tag .= " alt=\"" . $blosxom::title;
+  $tag .= "\"/></a>";
+
+  $thumbnail::image = $tag;
+
+  undef $size;
+
+  1;
+}
+
+1;
